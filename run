@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+rm -rf build
+mkdir -p ./build
+cd src
+javac -d ../build Remologue.java
+cd ../build
+jar cvfe Remologue.jar Remologue .
+cd ..
+cp .remologue ~/
+java -jar build/Remologue.jar

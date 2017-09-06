@@ -1,0 +1,2 @@
+{"proxy" : { "enable" : true, "type" : "HTTP", "address" : "10.66.243.130", "port": 8080 },
+"ignore" : ["\\[\\d+\\]", "mynetwork"]}
