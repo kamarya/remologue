@@ -1,2 +1,11 @@
-{"proxy" : { "enable" : true, "type" : "HTTP", "address" : "10.65.23.10", "port": 8080 },
-"ignore" : ["\\[\\d+\\]", "homenetwork"]}
+{
+   "ignore-list":[
+      "\\[\\d+\\]",
+      "mynetwork"
+   ],
+   "bind":{
+      "ip":"0.0.0.0",
+      "port":5514,
+      "protocol":"udp"
+   }
+}

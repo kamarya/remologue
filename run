@@ -8,6 +8,9 @@ cd src
 javac -d ../build Remologue.java
 cd ../build
 jar cvfe Remologue.jar Remologue .
+cp -R ../resources .
+zip -ur Remologue.jar resources
 cd ..
 cp .remologue ~/
 java -jar build/Remologue.jar
+

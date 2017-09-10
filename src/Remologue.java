@@ -53,17 +53,23 @@ import javafx.scene.layout.Priority;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.image.Image;
 import javafx.stage.StageStyle;
 import javafx.geometry.Insets;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCombination;
 
+
 import java.io.*;
 import java.net.*;
 import java.util.regex.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketAddress;
 
 public class Remologue extends Application implements Runnable, EventHandler<WindowEvent>
 {
@@ -82,7 +88,6 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
     private final static float WIDTH = 700;
     private final static float HEIGHT = 500;
     private final static int PACKETSIZE = 2048;
-    private final static int PORT = 5514;
     private Thread thread = new Thread(this);
 
     private static boolean running;
@@ -141,10 +146,10 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
 
         root.setCenter(anchorPane);
 
+        stage.getIcons().add(new Image("/resources/image/icon.png"));
         Scene scene = new Scene(root, WIDTH, HEIGHT);
 
         stage.setOnCloseRequest(this);
-        //stage.setOnHiding(this);
         stage.setScene(scene);
         stage.setTitle("Remologue");
         stage.setWidth(WIDTH);
@@ -165,7 +170,10 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
     {
         try
         {
-            socket = new DatagramSocket(PORT);
+            SocketAddress sockaddr = new InetSocketAddress(
+                    Settings.getInstance().getIPAddress(),
+                    Settings.getInstance().getPort());
+            socket = new DatagramSocket(sockaddr);
             DatagramPacket packet = new DatagramPacket(new byte[PACKETSIZE], PACKETSIZE);
 
             System.out.println("socket has been opened.");
@@ -191,7 +199,8 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
                 {
                     dataFiltered.addAll(item);
                 }
-                else if (filter && item.getMessage().contains(filterText) && item.getLevelInt() <= filterLevel)
+                else if (filter && item.getMessage().contains(filterText) &&
+                        item.getLevelInt() <= filterLevel)
                 {
                     dataFiltered.addAll(item);
                 }
@@ -382,7 +391,7 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
     void exitApp()
     {
         running = false;
-        socket.close();
+        if (socket != null) socket.close();
         Platform.exit();
     }
 }

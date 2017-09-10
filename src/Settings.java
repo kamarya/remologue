@@ -28,10 +28,9 @@ public class Settings
 {
     private static Settings instance = null;
 
-    private String   proxy_address  = null;
-    private int      proxy_port     = 0;
-    private String   proxy_type     = null;
-    private boolean  proxy_enable   = false;
+    private String   ip_address     = null;
+    private int      port           = 0;
+    private String   protocol       = null;
     private String   user_home      = null;
     private List<String> ignoreList = new ArrayList<String>();
 
@@ -48,13 +47,22 @@ public class Settings
             JSONTokener jsonTokener = new JSONTokener(local);
             JSONObject setting = new JSONObject(jsonTokener);
 
-            JSONObject jsonProxy = setting.getJSONObject("proxy");
-            proxy_enable = jsonProxy.getBoolean("enable");
-            proxy_address = jsonProxy.getString("address");
-            proxy_port = jsonProxy.getInt("port");
-            proxy_type = jsonProxy.getString("type");
+            JSONObject jsonBind = setting.getJSONObject("bind");
 
-            JSONArray jsonIgnore = setting.getJSONArray("ignore");
+            if (jsonBind != null)
+            {
+                ip_address = jsonBind.getString("ip");
+                port = jsonBind.getInt("port");
+                protocol = jsonBind.getString("protocol");
+            }
+            else
+            {
+                ip_address = "0.0.0.0"; // listen on all interfaces
+                port = 5514;
+                protocol = "udp";
+            }
+
+            JSONArray jsonIgnore = setting.getJSONArray("ignore-list");
 
             if (jsonIgnore != null)
             {
@@ -108,10 +116,9 @@ public class Settings
         return instance;
     }
 
-    public String getProxyAddress() {return proxy_address;}
-    public int getProxyPort() {return proxy_port;}
-    public String getProxyType() {return proxy_type;}
-    public boolean getProxyEnable() {return  proxy_enable;}
+    public String getIPAddress() {return ip_address;}
+    public int getPort() {return port;}
+    public String getProtocol() {return protocol;}
     public String getUserHome() {return  user_home;}
     public List<String> getIgnoreList() {return ignoreList;}
 }
