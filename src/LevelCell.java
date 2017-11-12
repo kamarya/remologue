@@ -19,7 +19,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TableCell;
 import javafx.scene.paint.Color;
 
-public class ColorCell extends TableCell<SyslogItem, String>
+public class LevelCell extends TableCell<SyslogItem, String>
 {
 
     @Override

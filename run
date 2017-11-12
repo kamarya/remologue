@@ -48,5 +48,5 @@ cp -R ../resources .
 zip -ur Remologue.jar resources
 cd ..
 cp .remologue ~/
-java -jar build/Remologue.jar
-
+java -jar build/Remologue.jar &
+disown

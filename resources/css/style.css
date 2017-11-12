@@ -1,0 +1,9 @@
+.table-view .column-header {
+    -fx-font-size: 11;
+    -fx-font-family: "Courier";
+}
+
+.table-view .table-cell{
+    -fx-font-size: 11;
+    -fx-font-family: "Courier";
+}

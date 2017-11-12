@@ -59,8 +59,12 @@ import javafx.geometry.Insets;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCombination;
+import javafx.stage.FileChooser;
 
-
+import java.io.FileWriter;
+import java.io.FileReader;
+import java.io.File;
+import java.io.BufferedReader;
 import java.io.*;
 import java.net.*;
 import java.util.regex.*;
@@ -70,8 +74,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
-public class Remologue extends Application implements Runnable, EventHandler<WindowEvent>
+public class Remologue extends Application implements Runnable
 {
 
     private SearchBox search = new SearchBox();
@@ -82,13 +89,15 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
     private ObservableList<SyslogItem> data = FXCollections.observableArrayList();
     private ObservableList<SyslogItem> dataFiltered = FXCollections.observableArrayList();
 
+
+    private MenuItem menuCBind = new MenuItem("Bind");
     private DatagramSocket socket;
     private static BorderPane root = new BorderPane();
 
     private final static float WIDTH = 700;
     private final static float HEIGHT = 500;
     private final static int PACKETSIZE = 2048;
-    private Thread thread = new Thread(this);
+    private Thread thread;
 
     private static boolean running;
     private static boolean filter;
@@ -129,11 +138,20 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
                 .subtract(timeCol.widthProperty())
                 .subtract(facilityCol.widthProperty())
                 .subtract(levelCol.widthProperty())
-                .subtract(1));
+                .subtract(0));
 
-        levelCol.setCellFactory(column -> {return new ColorCell();});
+        //timeCol.setCellFactory(column -> {return new GenericCell();});
+        //facilityCol.setCellFactory(column -> {return new GenericCell();});
+        //messageCol.setCellFactory(column -> {return new GenericCell();});
+        levelCol.setCellFactory(column -> {return new LevelCell();});
+
         table.setItems(data);
-        table.getColumns().addAll(timeCol, facilityCol, levelCol, messageCol);
+
+        // we wanna avoid addAll() warning
+        table.getColumns().add(timeCol);
+        table.getColumns().add(facilityCol);
+        table.getColumns().add(levelCol);
+        table.getColumns().add(messageCol);
 
         AnchorPane anchorPane = new AnchorPane();
         anchorPane.setPrefSize(WIDTH, HEIGHT);    
@@ -148,8 +166,21 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
 
         stage.getIcons().add(new Image("/resources/image/icon.png"));
         Scene scene = new Scene(root, WIDTH, HEIGHT);
+        scene.getStylesheets().addAll(this.getClass().getResource("/resources/css/style.css").toExternalForm());
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.END)
+            {
+                Platform.runLater( () -> table.scrollTo(table.getItems().size() - 1));
+                return;
+            }
+            if (event.getCode() == KeyCode.HOME)
+            {
+                Platform.runLater( () -> table.scrollTo(1));
+                return;
+            }
+        });
 
-        stage.setOnCloseRequest(this);
+        stage.setOnCloseRequest(event -> {handleOnClose(event);});
         stage.setScene(scene);
         stage.setTitle("Remologue");
         stage.setWidth(WIDTH);
@@ -160,8 +191,6 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
 
         Settings.getInstance();
 
-        running = true;
-        thread.start();
     }
 
     // TODO: 'upnp' and 'nat-pmp'
@@ -174,18 +203,29 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
                     Settings.getInstance().getIPAddress(),
                     Settings.getInstance().getPort());
             socket = new DatagramSocket(sockaddr);
+            socket.setSoTimeout(5000);
             DatagramPacket packet = new DatagramPacket(new byte[PACKETSIZE], PACKETSIZE);
 
-            System.out.println("socket has been opened.");
+            addInternalLog("socket has been opened.");
 
-            String message;
-            SyslogItem item;
+            String      message = new String();
+            SyslogItem  item;
 
             List<String> ignoreList = Settings.getInstance().getIgnoreList();
 
             while(running)
             {
-                socket.receive(packet);
+                try
+                {
+                    socket.receive(packet);
+                }
+                catch (SocketTimeoutException ex)
+                {
+                    if (!message.isEmpty()) addInternalLog("socket timeout.");
+                    message = "";
+                    continue;
+                }
+
                 message = new String(packet.getData(), packet.getOffset(), packet.getLength());
 
                 for (String repl : ignoreList)
@@ -208,98 +248,67 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
         }
         catch (SocketException ex)
         {
-            System.out.println("socket has been closed.");
+            addInternalLog("socket has been closed.");
         }
         catch (Exception ex)
         {
             running = false;
             System.out.println(ex);
         }
+        if (socket != null)
+        {
+            socket.close();
+            addInternalLog("socket has been closed.");
+        }
 
     }
 
-    @Override
-    public void handle(WindowEvent event)
+    void handleOnClose(WindowEvent event)
     {
-
-       Platform.runLater(new Runnable() {
-           @Override
-           public void run()
-           {
-               System.out.println("Handling event " + event.getEventType()); 
-               exitApp();
-           }
-       });
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run()
+            {
+                addInternalLog("Handling event " + event.getEventType());
+                exitApp();
+            }
+        });
     }
 
     void setupMenu()
     {
 
         final Menu menuFile = new Menu("File");
+        final Menu menuRemote = new Menu("Remote");
         final Menu menuHelp = new Menu("Help");
         MenuItem menuIAbout = new MenuItem("About");
         MenuItem menuIExit = new MenuItem("Exit");
+        MenuItem menuISave = new MenuItem("Save RAW");
+        MenuItem menuIOpen = new MenuItem("Open RAW");
         MenuItem menuIReset = new MenuItem("Reset");
         MenuItem menuIMemory = new MenuItem("Memory");
-        menuIExit.setAccelerator(new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN));
 
-        menuIAbout.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event)
-            {
-                Alert alert = new Alert(AlertType.INFORMATION);
-                alert.setTitle("About");
-                alert.setHeaderText(null);
-                alert.setContentText("Remologue Copyright 2017");
-                alert.showAndWait();
-            }
-        });
+        //menuIExit.setAccelerator(new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN));
 
-        menuIMemory.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event)
-            {
-                double memory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        menuIAbout.setOnAction(event -> {displayAbout();});
 
-                String unit = "[Bytes]";
+        menuISave.setOnAction(event -> {saveLogs();});
+        menuIOpen.setOnAction(event -> {openLogs();});
 
-                if (memory > 1024)
-                {
-                    memory /= 1024;
-                    unit = "[KBytes]";
-                }
-
-                if (memory > 1024)
-                {
-                    memory /= 1024;
-                    unit = "[MBytes]";
-                }
-
-                if (memory > 1024)
-                {
-                    memory /= 1024;
-                    unit = "[GBytes]";
-                }
-
-                Alert alert = new Alert(AlertType.INFORMATION);
-                alert.setTitle("Remologue");
-                alert.setHeaderText(null);
-                alert.setContentText("Memory Usage : " + String.format("%.2f", memory) + "  " + unit);
-                alert.showAndWait();
-            }
-        });
+        menuIMemory.setOnAction(event -> {displayMemory();});
 
         menuIExit.setOnAction(event -> {exitApp();});
 
-        menuIReset.setOnAction(event -> {
-            data.clear();
-            dataFiltered.clear();
-        });
+        menuIReset.setOnAction(event -> {resetAll();});
+
+        menuCBind.setOnAction(event -> {connect();});
 
         menuHelp.getItems().addAll(menuIMemory, menuIAbout);
-        menuFile.getItems().addAll(menuIReset, new SeparatorMenuItem(), menuIExit);
+        menuRemote.getItems().addAll(menuCBind);
+        menuFile.getItems().addAll(menuISave, menuIOpen, menuIReset, new SeparatorMenuItem(), menuIExit);
         MenuBar menuBar = new MenuBar();
-        menuBar.getMenus().addAll(menuFile, menuHelp);
+        //menuBar.prefWidthProperty().bind(root.getScene().getWindow().widthProperty());
+        menuBar.getMenus().addAll(menuFile, menuRemote, menuHelp);
 
         MenuHeight = menuBar.getHeight() + 1;
 
@@ -320,11 +329,14 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
 
         levelCombo = new ComboBox<String>();
 
-        for (int indx = 0; indx < 8; indx++)
+        for (int indx = SyslogItem.LOG_EMERG; indx <= SyslogItem.LOG_INTERN; indx++)
+        {
             levelCombo.getItems().add(SyslogItem.getLevelString(indx));
+        }
+
         levelCombo.setEditable(false);
         levelCombo.getSelectionModel().selectLast();
-        filterLevel = 7;
+        filterLevel = SyslogItem.LOG_DEBUG;
         levelCombo.setOnAction(event -> {
             filterLevelString = levelCombo.getSelectionModel().getSelectedItem().toString();
             filterLevel = levelCombo.getSelectionModel().getSelectedIndex();
@@ -337,7 +349,6 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
 
         VBox vBox = new VBox();
         vBox.getChildren().addAll(menuBar, toolBar);
-        //HBox.setHgrow(search, Priority.ALWAYS);
         HBox.setHgrow(search, Priority.SOMETIMES);
         root.setTop(vBox);
     }
@@ -349,7 +360,7 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
         levelCombo.setDisable(true);
         butClear.setDisable(false);
 
-        if (search.getText().isEmpty() && filterLevel == SyslogItem.LOG_DEBUG)
+        if (search.getText().isEmpty() && filterLevel >= SyslogItem.LOG_DEBUG)
         {
             filter = false;
             clearFilter();
@@ -360,7 +371,7 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
         filterText = search.getText();
         dataFiltered.clear();
 
-        System.out.println("apply filter with level (" + filterLevelString + ") and (" + filterText + ")");
+        addInternalLog("apply filter with level (" + filterLevelString + ") and (" + filterText + ")");
 
         for (SyslogItem item : data)
         {
@@ -394,4 +405,154 @@ public class Remologue extends Application implements Runnable, EventHandler<Win
         if (socket != null) socket.close();
         Platform.exit();
     }
+
+    void displayMemory()
+    {
+        double memory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+
+        String unit = "[Bytes]";
+
+        if (memory > 1024)
+        {
+            memory /= 1024;
+            unit = "[KBytes]";
+        }
+
+        if (memory > 1024)
+        {
+            memory /= 1024;
+            unit = "[MBytes]";
+        }
+
+        if (memory > 1024)
+        {
+            memory /= 1024;
+            unit = "[GBytes]";
+        }
+
+        Alert alert = new Alert(AlertType.INFORMATION);
+        alert.setTitle("Remologue");
+        alert.setHeaderText(null);
+        alert.setContentText("Memory Usage : " + String.format("%.2f", memory) + "  " + unit);
+        alert.showAndWait();
+    }
+
+    void saveLogs()
+    {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Logs");
+        File file = fileChooser.showSaveDialog(root.getScene().getWindow());
+        if (file != null)
+        {
+            try
+            {
+                System.out.println("save file : " + file.getPath());
+                String raw = new String();
+                FileWriter writer = new FileWriter(file.getPath()); 
+                for(SyslogItem item: data)
+                {
+                    raw = item.getRAW();
+                    if (!raw.isEmpty())
+                        writer.write(raw);
+                }
+                writer.close();
+            }
+            catch (IOException ex)
+            {
+                System.out.println(ex.getMessage());
+            }
+        }
+    }
+
+    void openLogs()
+    {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Open Logs");
+        File file = fileChooser.showSaveDialog(root.getScene().getWindow());
+        if (file != null)
+        {
+            running = false;
+            menuCBind.setText("Bind");
+
+            resetAll();
+
+            String line = new String();
+            SyslogItem  item;
+            List<String> ignoreList = Settings.getInstance().getIgnoreList();
+
+            try
+            {
+                addInternalLog("read file : " + file.getPath());
+
+                FileReader reader = new FileReader(file);
+                BufferedReader breader = new BufferedReader(reader);
+
+                while ((line = breader.readLine()) != null)
+                {
+
+                    for (String repl : ignoreList)
+                        line = line.replaceAll(repl, "");
+
+                    item = new SyslogItem(line);
+
+                    data.addAll(item);
+
+                    if (filter && filterText.isEmpty() && item.getLevelInt() <= filterLevel)
+                    {
+                        dataFiltered.addAll(item);
+                    }
+                    else if (filter && item.getMessage().contains(filterText) &&
+                            item.getLevelInt() <= filterLevel)
+                    {
+                        dataFiltered.addAll(item);
+                    }
+                }
+
+                reader.close();
+            }
+            catch (IOException ex)
+            {
+                System.out.println(ex.getMessage());
+            }
+        }
+    }
+
+    void displayAbout()
+    {
+        Alert alert = new Alert(AlertType.INFORMATION);
+        alert.setTitle("About");
+        alert.setHeaderText(null);
+        alert.setContentText("Remologue Copyright 2017");
+        alert.showAndWait();
+    }
+
+    void connect()
+    {
+        if (running)
+        {
+            running = false;
+            menuCBind.setText("Bind");
+        }
+        else
+        {
+            thread = new Thread(this);
+            running = true;
+            thread.start();
+            menuCBind.setText("Unbind");
+        }
+    }
+
+    void resetAll()
+    {
+        data.clear();
+        dataFiltered.clear();
+    }
+
+    void addInternalLog(String msg)
+    {
+        String time = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss.SSS").format(new Date());
+        SyslogItem item = new SyslogItem(time, SyslogItem.LOG_REMO, SyslogItem.LOG_INTERN, msg);
+        data.addAll(item);
+    }
+    
 }

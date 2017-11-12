@@ -31,6 +31,7 @@ public class SyslogItem
     public static final int LOG_NOTICE	= 5; // normal but significant condition
     public static final int LOG_INFO	= 6; // informational
     public static final int LOG_DEBUG	= 7; // debug-level messages
+    public static final int LOG_INTERN  = 8; // internal
     public static final int LOG_LEVMASK = 0x0007; // mask to extract priority
     public static final int LOG_FACMASK = 0x03f8; // mask to extract priority
 
@@ -44,7 +45,17 @@ public class SyslogItem
     public static final int LOG_LPR	    = 6; // line printer subsystem
     public static final int LOG_NEWS	= 7; // network news subsystem
     public static final int LOG_UUCP	= 8; // UUCP subsystem
-    public static final int LOG_CRON	= 15; // clock daemon
+    public static final int LOG_CRON0	= 9; // clock daemon
+    public static final int LOG_CRON1	= 15; // clock daemon
+    public static final int LOG_LOCAL0	= 16; // local
+    public static final int LOG_LOCAL1	= 17; // local
+    public static final int LOG_LOCAL2	= 18; // local
+    public static final int LOG_LOCAL3	= 19; // local
+    public static final int LOG_LOCAL4	= 20; // local
+    public static final int LOG_LOCAL5	= 21; // local
+    public static final int LOG_LOCAL6	= 22; // local
+    public static final int LOG_LOCAL7	= 23; // local
+    public static final int LOG_REMO    = 99; // Internal
 
     private final SimpleStringProperty time;
     private final SimpleStringProperty facility;
@@ -52,9 +63,11 @@ public class SyslogItem
     private final SimpleStringProperty message;
 
     private final int intLevel;
+    private final String raw;
 
     SyslogItem(String time, String facility, String level, String message)
     {
+        this.raw = new String();
         this.time = new SimpleStringProperty(time);
         this.facility = new SimpleStringProperty(facility);
         this.level = new SimpleStringProperty(level);
@@ -62,9 +75,20 @@ public class SyslogItem
         this.intLevel = 0;
     }
 
+    SyslogItem(String time, int facility, int level, String message)
+    {
+        String line = "<" + ">" + message;
+        this.raw = new String();
+        this.time = new SimpleStringProperty(time);
+        this.facility = new SimpleStringProperty(getFacilityString(facility));
+        this.level = new SimpleStringProperty(getLevelString(level));
+        this.message = new SimpleStringProperty(message);
+        this.intLevel = 0;
+    }
+
     SyslogItem(String line)
     {
-
+        this.raw = line;
         int startBracketPos = line.indexOf('<');
         int endBracketPos   = line.indexOf('>');
         String priority = line.substring(startBracketPos + 1, endBracketPos);
@@ -80,6 +104,11 @@ public class SyslogItem
         this.message = new SimpleStringProperty(line.substring(endBracketPos + 1));
 
         this.time = new SimpleStringProperty(new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss.SSS").format(new Date()));
+    }
+
+    public String getRAW()
+    {
+        return raw;
     }
 
     public String getTime()
@@ -155,6 +184,9 @@ public class SyslogItem
             case LOG_ALERT:
                 return "ALERT";
 
+            case LOG_INTERN:
+                return "INTERN";
+
             default:
                 return "UNKNOWN";
         }
@@ -179,10 +211,26 @@ public class SyslogItem
             case LOG_MAIL:
                 return "MAIL";
 
+            case LOG_AUTH:
+                return "AUTH";
+
             case LOG_NEWS:
                 return "NEWS";
 
+            case LOG_REMO:
+                return "REMO";
+
+            case LOG_LOCAL5:
+                return "LOCAL5";
+
+            case LOG_LOCAL6:
+                return "LOCAL6";
+
+            case LOG_LOCAL7:
+                return "LOCAL7";
+
             default:
+                //System.out.println("Unknown facility : " + Integer.toString(index));
                 return "UNKNOWN";
         }
     }

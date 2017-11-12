@@ -1,7 +1,7 @@
 {
    "ignore-list":[
       "\\[\\d+\\]",
-      "mynetwork"
+      "Sep|Aug|May|Jan|Feb\\[ \\]\\[\\d+\\]"
    ],
    "bind":{
       "ip":"0.0.0.0",
