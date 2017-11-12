@@ -81,21 +81,21 @@ import java.util.Date;
 public class Remologue extends Application implements Runnable
 {
 
-    private SearchBox search = new SearchBox();
+
     private Button butApply;
     private Button butClear;
     private ComboBox <String> levelCombo;
-    private TableView <SyslogItem> table = new TableView<SyslogItem>();
+    private SearchBox search              = new SearchBox();
+    private TableView <SyslogItem> table  = new TableView<SyslogItem>();
     private ObservableList<SyslogItem> data = FXCollections.observableArrayList();
     private ObservableList<SyslogItem> dataFiltered = FXCollections.observableArrayList();
 
-
-    private MenuItem menuCBind = new MenuItem("Bind");
     private DatagramSocket socket;
-    private static BorderPane root = new BorderPane();
+    private MenuItem menuCBind      = new MenuItem("Bind");
+    private static BorderPane root  = new BorderPane();
 
-    private final static float WIDTH = 700;
-    private final static float HEIGHT = 500;
+    private final static float WIDTH    = 700;
+    private final static float HEIGHT   = 500;
     private final static int PACKETSIZE = 2048;
     private Thread thread;
 
@@ -468,7 +468,7 @@ public class Remologue extends Application implements Runnable
     {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Open Logs");
-        File file = fileChooser.showSaveDialog(root.getScene().getWindow());
+        File file = fileChooser.showOpenDialog(root.getScene().getWindow());
         if (file != null)
         {
             running = false;
@@ -476,16 +476,16 @@ public class Remologue extends Application implements Runnable
 
             resetAll();
 
-            String line = new String();
             SyslogItem  item;
+            String line             = new String();
             List<String> ignoreList = Settings.getInstance().getIgnoreList();
 
             try
             {
                 addInternalLog("read file : " + file.getPath());
 
-                FileReader reader = new FileReader(file);
-                BufferedReader breader = new BufferedReader(reader);
+                FileReader reader       = new FileReader(file);
+                BufferedReader breader  = new BufferedReader(reader);
 
                 while ((line = breader.readLine()) != null)
                 {
