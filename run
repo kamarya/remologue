@@ -18,7 +18,7 @@ javapackager \
   -deploy \
   -Bruntime=${JAVA_HOME} \
   -Bicon=package/macosx/Remologue.icns \
-  -native dmg \
+  -native image \
   -srcdir . \
   -srcfiles Remologue.jar \
   -outdir deploy \
