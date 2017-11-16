@@ -2,6 +2,56 @@
 
 set -e
 
+OPTION=$1
+
+PLATFORM=`uname`
+
+function usage() {
+    echo $0 [run\|pack\|clean]
+}
+
+function macos_pack() {
+JAVA_HOME=`/usr/libexec/java_home -v 1.8`
+APP_DIR_NAME=Remologue.app
+
+javapackager \
+  -deploy \
+  -Bruntime=${JAVA_HOME} \
+  -Bicon=package/macosx/Remologue.icns \
+  -native dmg \
+  -srcdir . \
+  -srcfiles Remologue.jar \
+  -outdir deploy \
+  -outfile ${APP_DIR_NAME} \
+  -appclass Remologue \
+  -name "Remologue" \
+  -title "Remologue" \
+  -vendor "Remologue" \
+  -nosign \
+  -v
+}
+
+function macos_icns() {
+cp resources/image/icon.png Remologue.png
+mkdir Remologue.iconset
+sips -z 512 512 Remologue.png --out Remologue.iconset/icon_512x512.png
+iconutil --convert icns Remologue.iconset
+mkdir -p package/macosx
+cp Remologue.icns package/macosx
+}
+
+if [ -z $OPTION ];then
+    echo program option is missing
+    usage
+    exit
+fi
+
+if [ "$OPTION" == "clean" ];then
+    echo \'build\' has been removed.
+    rm -rf build
+    exit
+fi
+
 if type -p java; then
     _java=java
 elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/java" ]];  then
@@ -46,7 +96,20 @@ cd ../build
 jar cvfe Remologue.jar Remologue .
 cp -R ../resources .
 zip -ur Remologue.jar resources
+if [ "$OPTION" == "pack" ];then
+
+    if [ "$PLATFORM" == "Darwin" ]; then
+      echo MacOS bundle will be created.
+      macos_icns
+      macos_pack
+    else
+      echo $PLATFORM is not supported yet.
+    fi
+fi
+
+if [ "$OPTION" == "run" ];then
 cd ..
 cp .remologue ~/
 java -jar build/Remologue.jar &
 disown
+fi
