@@ -1,7 +1,10 @@
-# remologue
-A Syslog message logging client with a JavaFX interface.
+# Remologue
+A Syslog message logging network client with a JavaFX graphical user interface (GUI).
 ## Build and Run
 Java Development Kit (JDK) 1.8 or later is required.
-The shell script **run** builds and runs the software.
+The shell script **run** builds, runs and packs the software on Unix like
+operating systems such as Linux and macOS.
+
+To create the macOS bundle run ```./run pack```and take the executable bundle from `build/deploy/bundles/Remologue.app`.
 ## Settings
 The software settings can be changed in **.remologue** file in the user's home.
