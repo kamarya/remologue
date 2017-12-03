@@ -6,42 +6,101 @@ OPTION=$1
 
 PLATFORM=`uname`
 
+# function
 function usage() {
     echo $0 [run\|pack\|clean]
 }
 
-function macos_pack() {
-JAVA_HOME=`/usr/libexec/java_home -v 1.8`
-APP_DIR_NAME=Remologue.app
+# function
+function check_jre_jdk() {
+    if type -p java; then
+        _java=java
+    elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/java" ]];  then
+        _java="$JAVA_HOME/bin/java"
+    else
+        echo 'could not find Java Runtime Environment (JRE)'
+        exit
+    fi
 
-javapackager \
-  -deploy \
-  -Bruntime=${JAVA_HOME} \
-  -Bicon=package/macosx/Remologue.icns \
-  -native image \
-  -srcdir . \
-  -srcfiles Remologue.jar \
-  -outdir deploy \
-  -outfile ${APP_DIR_NAME} \
-  -appclass Remologue \
-  -name "Remologue" \
-  -title "Remologue" \
-  -vendor "Remologue" \
-  -nosign \
-  -v
+    if type -p javac; then
+        _javac=javac
+    elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/javac" ]];  then
+        _javac="$JAVA_HOME/bin/javac"
+    else
+        echo 'could not find Java Development Kit (JDK).'
+        exit
+    fi
+
+    if [[ "$_javac" ]]; then
+        javac_ver=$("$_javac" -version 2>&1 | awk '/javac/ {print $2}')
+        echo javac version "$javac_ver"
+        if [[ ! "$javac_ver" > "1.8.0" ]]; then
+            echo 'you need JDK 1.8 or later to build this software.'
+            exit
+        fi
+    fi
+
+    if [[ "$_java" ]]; then
+        java_ver=$("$_java" -version 2>&1 | awk -F '"' '/version/ {print $2}')
+        echo java version "$java_ver"
+        if [[ ! "$java_ver" > "1.8.0" ]]; then
+            echo 'you need JRE 1.8 or later to run this software.'
+            exit
+        fi
+    fi
 }
 
+# function
+function clean_build_all() {
+    rm -rf build
+    mkdir -p ./build
+    cd src
+    javac -d ../build Remologue.java -Xlint
+    cd ../build
+    jar cvfe Remologue.jar Remologue .
+    cp -R ../resources .
+    cp ../.remologue ../resources/json/settings.json
+    cd resources
+    zip -ur ../Remologue.jar image
+    zip -ur ../Remologue.jar json
+    zip -ur ../Remologue.jar css
+    cd ..
+}
+
+# function
 function macos_icns() {
-cp resources/image/icon.png Remologue.png
-mkdir Remologue.iconset
-sips -z 512 512 Remologue.png --out Remologue.iconset/icon_512x512.png
-iconutil --convert icns Remologue.iconset
-mkdir -p package/macosx
-cp Remologue.icns package/macosx
+    cp resources/image/icon.png Remologue.png
+    mkdir Remologue.iconset
+    sips -z 512 512 Remologue.png --out Remologue.iconset/icon_512x512.png
+    iconutil --convert icns Remologue.iconset
+    mkdir -p package/macosx
+    cp Remologue.icns package/macosx
+}
+
+# function
+function macos_pack() {
+    JAVA_HOME=`/usr/libexec/java_home -v 1.8`
+    APP_DIR_NAME=Remologue.app
+
+    javapackager \
+      -deploy \
+      -Bruntime=${JAVA_HOME} \
+      -Bicon=package/macosx/Remologue.icns \
+      -native image \
+      -srcdir . \
+      -srcfiles Remologue.jar \
+      -outdir deploy \
+      -outfile ${APP_DIR_NAME} \
+      -appclass Remologue \
+      -name "Remologue" \
+      -title "Remologue" \
+      -vendor "Remologue" \
+      -nosign \
+      -v
 }
 
 if [ -z $OPTION ];then
-    echo program option is missing
+    echo the script option is missing.
     usage
     exit
 fi
@@ -52,52 +111,11 @@ if [ "$OPTION" == "clean" ];then
     exit
 fi
 
-if type -p java; then
-    _java=java
-elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/java" ]];  then
-    _java="$JAVA_HOME/bin/java"
-else
-    echo 'could not find Java Runtime Environment (JRE)'
-    exit
-fi
+check_jre_jdk
+clean_build_all
 
-if type -p javac; then
-    _javac=javac
-elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/javac" ]];  then
-    _javac="$JAVA_HOME/bin/javac"
-else
-    echo 'could not find Java Development Kit (JDK).'
-    exit
-fi
-
-if [[ "$_javac" ]]; then
-    javac_ver=$("$_javac" -version 2>&1 | awk '/javac/ {print $2}')
-    echo javac version "$javac_ver"
-    if [[ ! "$javac_ver" > "1.8.0" ]]; then
-        echo 'you need JDK 1.8 or later to build this software.'
-        exit
-    fi
-fi
-
-if [[ "$_java" ]]; then
-    java_ver=$("$_java" -version 2>&1 | awk -F '"' '/version/ {print $2}')
-    echo java version "$java_ver"
-    if [[ ! "$java_ver" > "1.8.0" ]]; then
-        echo 'you need JRE 1.8 or later to run this software.'
-        exit
-    fi
-fi
-
-rm -rf build
-mkdir -p ./build
-cd src
-javac -d ../build Remologue.java -Xlint
-cd ../build
-jar cvfe Remologue.jar Remologue .
-cp -R ../resources .
-zip -ur Remologue.jar resources
+# post compilation actions
 if [ "$OPTION" == "pack" ];then
-
     if [ "$PLATFORM" == "Darwin" ]; then
       echo MacOS bundle will be created.
       macos_icns
@@ -108,8 +126,7 @@ if [ "$OPTION" == "pack" ];then
 fi
 
 if [ "$OPTION" == "run" ];then
-cd ..
-cp .remologue ~/
-java -jar build/Remologue.jar &
-disown
+    cd ..
+    cp .remologue ~/
+    java -jar build/Remologue.jar & disown
 fi

@@ -1,0 +1,37 @@
+apply plugin: 'java'
+apply plugin: 'java-library'
+apply plugin: 'application'
+
+
+def jdkVersion = 1.8
+sourceCompatibility = jdkVersion
+targetCompatibility = jdkVersion
+
+
+mainClassName = 'Remologue'
+
+
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['resources']
+        }
+    }
+}
+
+jar {
+
+    dependsOn configurations.runtime
+
+    manifest {
+        attributes 'Main-Class': 'Remologue'
+    }
+
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
