@@ -619,34 +619,4 @@ public class Remologue extends Application implements Runnable
         return matcher.lookingAt();
     }
 
-    public static String getPath (Object o)
-    {
-        if ( o == null )
-        {
-            return null;
-        }
-
-        Class<?> c = o.getClass();
-        ClassLoader loader = c.getClassLoader();
-
-        if ( loader == null )
-        {
-            // Try the bootstrap classloader - obtained from the ultimate parent of the System Class Loader.
-            loader = ClassLoader.getSystemClassLoader();
-            while ( loader != null && loader.getParent() != null )
-            {
-                loader = loader.getParent();
-            }
-        }
-        if (loader != null)
-        {
-            String name = c.getCanonicalName();
-            URL resource = loader.getResource(name.replace(".", "/") + ".class");
-            if ( resource != null )
-            {
-                return resource.toString();
-            }
-        }
-        return null;
-    }
 }
