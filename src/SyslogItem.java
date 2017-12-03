@@ -32,8 +32,8 @@ public class SyslogItem
     public static final int LOG_INFO	= 6; // informational
     public static final int LOG_DEBUG	= 7; // debug-level messages
     public static final int LOG_INTERN  = 8; // internal
-    public static final int LOG_LEVMASK = 0x0007; // mask to extract priority
-    public static final int LOG_FACMASK = 0x03f8; // mask to extract priority
+    public static final int LOG_LEVMASK = 0x0007; // mask to extract level
+    public static final int LOG_FACMASK = 0x03F8; // mask to extract priority
 
     // Facilities.
     public static final int LOG_KERN	= 0; // kernel messages
@@ -62,28 +62,29 @@ public class SyslogItem
     private final SimpleStringProperty level;
     private final SimpleStringProperty message;
 
-    private final int intLevel;
-    private final String raw;
+    private final int       intLevel;
+    private final String    raw;
 
     SyslogItem(String time, String facility, String level, String message)
     {
-        this.raw = new String();
-        this.time = new SimpleStringProperty(time);
-        this.facility = new SimpleStringProperty(facility);
-        this.level = new SimpleStringProperty(level);
-        this.message = new SimpleStringProperty(message);
-        this.intLevel = 0;
+        this.raw        = new String();
+        this.time       = new SimpleStringProperty(time);
+        this.facility   = new SimpleStringProperty(facility);
+        this.level      = new SimpleStringProperty(level);
+        this.message    = new SimpleStringProperty(message);
+        this.intLevel   = 0;
     }
 
     SyslogItem(String time, int facility, int level, String message)
     {
-        String line = "<" + ">" + message;
-        this.raw = new String();
-        this.time = new SimpleStringProperty(time);
-        this.facility = new SimpleStringProperty(getFacilityString(facility));
-        this.level = new SimpleStringProperty(getLevelString(level));
-        this.message = new SimpleStringProperty(message);
-        this.intLevel = 0;
+        this.time       = new SimpleStringProperty(time);
+        this.facility   = new SimpleStringProperty(getFacilityString(facility));
+        this.level      = new SimpleStringProperty(getLevelString(level));
+        this.message    = new SimpleStringProperty(message);
+        this.intLevel   = level;
+
+        int flag = level & LOG_LEVMASK + (facility << 3) & LOG_FACMASK;
+        this.raw = "<" + Integer.toString(flag) + ">" + message;
     }
 
     SyslogItem(String line)
@@ -91,17 +92,15 @@ public class SyslogItem
         this.raw = line;
         int startBracketPos = line.indexOf('<');
         int endBracketPos   = line.indexOf('>');
-        String priority = line.substring(startBracketPos + 1, endBracketPos);
+        String priority     = line.substring(startBracketPos + 1, endBracketPos);
 
-        int flag = Integer.parseInt(priority);
+        int flag        = Integer.parseInt(priority);
         int intFacility = (flag & LOG_FACMASK) >> 3;
-        int intLevel = flag & LOG_LEVMASK;
-
-        this.intLevel = intLevel;
-
-        this.facility = new SimpleStringProperty(getFacilityString(intFacility));
-        this.level = new SimpleStringProperty(getLevelString(intLevel));
-        this.message = new SimpleStringProperty(line.substring(endBracketPos + 1));
+        int intLevel    = flag & LOG_LEVMASK;
+        this.intLevel   = intLevel;
+        this.facility   = new SimpleStringProperty(getFacilityString(intFacility));
+        this.level      = new SimpleStringProperty(getLevelString(intLevel));
+        this.message    = new SimpleStringProperty(line.substring(endBracketPos + 1));
 
         this.time = new SimpleStringProperty(new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss.SSS").format(new Date()));
     }
@@ -218,7 +217,10 @@ public class SyslogItem
                 return "NEWS";
 
             case LOG_REMO:
-                return "REMO";
+                return "REMOLOG";
+
+            case LOG_LOCAL4:
+                return "LOCAL4";
 
             case LOG_LOCAL5:
                 return "LOCAL5";
@@ -230,7 +232,6 @@ public class SyslogItem
                 return "LOCAL7";
 
             default:
-                //System.out.println("Unknown facility : " + Integer.toString(index));
                 return "UNKNOWN";
         }
     }

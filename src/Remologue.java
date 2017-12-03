@@ -77,6 +77,9 @@ import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.lang.ClassLoader;
 
 public class Remologue extends Application implements Runnable
 {
@@ -101,14 +104,21 @@ public class Remologue extends Application implements Runnable
 
     private static boolean running;
     private static boolean filter;
-    private String filterText;
-    private String filterLevelString;
-    private int filterLevel;
+    private String  filterText;
+    private String  filterLevelString;
+    private int     filterLevel;
+    private final static int SOCKET_TIMEOUT = 10000;
 
     private double MenuHeight = 5.0;
 
     public static void main(String[] args)
     {
+        if (Settings.getInstance().getStatus() != ErrorStatus.NONE)
+        {
+            System.out.println("fatal error occurred.");
+            return;
+        }
+
         launch(args);
     }
 
@@ -164,9 +174,16 @@ public class Remologue extends Application implements Runnable
 
         root.setCenter(anchorPane);
 
-        stage.getIcons().add(new Image("/resources/image/icon.png"));
+        stage.getIcons().add(new Image("image/icon.png"));
         Scene scene = new Scene(root, WIDTH, HEIGHT);
-        scene.getStylesheets().addAll(this.getClass().getResource("/resources/css/style.css").toExternalForm());
+
+        URL css = this.getClass().getClassLoader().getResource("css/style.css");
+        if (css != null)
+        {
+            scene.getStylesheets().addAll(css.toExternalForm());
+        }
+        
+
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.END)
             {
@@ -200,13 +217,14 @@ public class Remologue extends Application implements Runnable
         try
         {
             SocketAddress sockaddr = new InetSocketAddress(
-                    Settings.getInstance().getIPAddress(),
+                    Settings.getInstance().getInterface(),
                     Settings.getInstance().getPort());
             socket = new DatagramSocket(sockaddr);
-            socket.setSoTimeout(5000);
+            socket.setSoTimeout(SOCKET_TIMEOUT);
             DatagramPacket packet = new DatagramPacket(new byte[PACKETSIZE], PACKETSIZE);
 
             addInternalLog("socket has been opened.");
+            menuCBind.setText("Unbind");
 
             String      message = new String();
             SyslogItem  item;
@@ -221,7 +239,7 @@ public class Remologue extends Application implements Runnable
                 }
                 catch (SocketTimeoutException ex)
                 {
-                    if (!message.isEmpty()) addInternalLog("socket timeout.");
+                    if (!message.isEmpty()) addInternalLog("inactive log stream.");
                     message = "";
                     continue;
                 }
@@ -239,8 +257,7 @@ public class Remologue extends Application implements Runnable
                 {
                     dataFiltered.addAll(item);
                 }
-                else if (filter && item.getMessage().contains(filterText) &&
-                        item.getLevelInt() <= filterLevel)
+                else if (filter && filterCheck(item.getMessage()) && item.getLevelInt() <= filterLevel)
                 {
                     dataFiltered.addAll(item);
                 }
@@ -248,17 +265,22 @@ public class Remologue extends Application implements Runnable
         }
         catch (SocketException ex)
         {
+            running = false;
             addInternalLog("socket has been closed.");
+            menuCBind.setText("Bind");
         }
         catch (Exception ex)
         {
             running = false;
+            menuCBind.setText("Bind");
             System.out.println(ex);
         }
+
         if (socket != null)
         {
             socket.close();
             addInternalLog("socket has been closed.");
+            menuCBind.setText("Bind");
         }
 
     }
@@ -286,7 +308,8 @@ public class Remologue extends Application implements Runnable
         MenuItem menuISave = new MenuItem("Save RAW");
         MenuItem menuIOpen = new MenuItem("Open RAW");
         MenuItem menuIReset = new MenuItem("Reset");
-        MenuItem menuIMemory = new MenuItem("Memory");
+        MenuItem menuIReload = new MenuItem("Reload Settings");
+        MenuItem menuIStats = new MenuItem("Statistics");
 
         //menuIExit.setAccelerator(new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN));
 
@@ -294,18 +317,22 @@ public class Remologue extends Application implements Runnable
 
         menuISave.setOnAction(event -> {saveLogs();});
         menuIOpen.setOnAction(event -> {openLogs();});
+        menuIReload.setOnAction(event -> {reloadSettings();});
 
-        menuIMemory.setOnAction(event -> {displayMemory();});
+        menuIStats.setOnAction(event -> {displayStats();});
 
         menuIExit.setOnAction(event -> {exitApp();});
 
         menuIReset.setOnAction(event -> {resetAll();});
 
-        menuCBind.setOnAction(event -> {connect();});
+        menuCBind.setOnAction(event -> {
+            if (running) disconnect();
+            else connect();
+        });
 
-        menuHelp.getItems().addAll(menuIMemory, menuIAbout);
+        menuHelp.getItems().addAll(menuIStats, menuIAbout);
         menuRemote.getItems().addAll(menuCBind);
-        menuFile.getItems().addAll(menuISave, menuIOpen, menuIReset, new SeparatorMenuItem(), menuIExit);
+        menuFile.getItems().addAll(menuISave, menuIOpen, menuIReset, menuIReload, new SeparatorMenuItem(), menuIExit);
         MenuBar menuBar = new MenuBar();
         //menuBar.prefWidthProperty().bind(root.getScene().getWindow().widthProperty());
         menuBar.getMenus().addAll(menuFile, menuRemote, menuHelp);
@@ -337,6 +364,7 @@ public class Remologue extends Application implements Runnable
         levelCombo.setEditable(false);
         levelCombo.getSelectionModel().selectLast();
         filterLevel = SyslogItem.LOG_DEBUG;
+        filterLevelString = levelCombo.getSelectionModel().getSelectedItem().toString();
         levelCombo.setOnAction(event -> {
             filterLevelString = levelCombo.getSelectionModel().getSelectedItem().toString();
             filterLevel = levelCombo.getSelectionModel().getSelectedIndex();
@@ -360,7 +388,7 @@ public class Remologue extends Application implements Runnable
         levelCombo.setDisable(true);
         butClear.setDisable(false);
 
-        if (search.getText().isEmpty() && filterLevel >= SyslogItem.LOG_DEBUG)
+        if (search.getText().isEmpty() && filterLevel >= SyslogItem.LOG_INTERN)
         {
             filter = false;
             clearFilter();
@@ -371,19 +399,33 @@ public class Remologue extends Application implements Runnable
         filterText = search.getText();
         dataFiltered.clear();
 
-        addInternalLog("apply filter with level (" + filterLevelString + ") and (" + filterText + ")");
-
-        for (SyslogItem item : data)
+        if (filterText.isEmpty())
         {
-            if (filterText.isEmpty() && item.getLevelInt() <= filterLevel)
+
+            addInternalLog("apply filter with level (" + filterLevelString + ")");
+
+            for (SyslogItem item : data)
             {
-                dataFiltered.add(item);
-            }
-            else if (item.getMessage().contains(filterText) && item.getLevelInt() <= filterLevel)
-            {
-                dataFiltered.add(item);
+                if (item.getLevelInt() <= filterLevel)
+                {
+                    dataFiltered.add(item);
+                }
             }
         }
+        else
+        {
+
+            addInternalLog("apply filter with level (" + filterLevelString + ") and (" + filterText + ")");
+
+            for (SyslogItem item : data)
+            {
+                if (filterCheck(item.getMessage()) && item.getLevelInt() <= filterLevel)
+                {
+                    dataFiltered.add(item);
+                }
+            }
+        }
+
 
         table.setItems(dataFiltered);
 
@@ -401,12 +443,11 @@ public class Remologue extends Application implements Runnable
 
     void exitApp()
     {
-        running = false;
-        if (socket != null) socket.close();
+        disconnect();
         Platform.exit();
     }
 
-    void displayMemory()
+    void displayStats()
     {
         double memory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
@@ -430,11 +471,30 @@ public class Remologue extends Application implements Runnable
             unit = "[GBytes]";
         }
 
+        String msg = "Memory Usage : " + String.format("%.2f", memory) + "  " + unit;
+
         Alert alert = new Alert(AlertType.INFORMATION);
         alert.setTitle("Remologue");
         alert.setHeaderText(null);
-        alert.setContentText("Memory Usage : " + String.format("%.2f", memory) + "  " + unit);
+        alert.setContentText(msg);
         alert.showAndWait();
+    }
+
+    void reloadSettings()
+    {
+        if (running)
+        {
+            disconnect();
+            Settings.getInstance().reload();
+            connect();
+        }
+        else
+        {
+
+            Settings.getInstance().reload();
+        }
+
+        addInternalLog("settings reloaded.");
     }
 
     void saveLogs()
@@ -471,8 +531,7 @@ public class Remologue extends Application implements Runnable
         File file = fileChooser.showOpenDialog(root.getScene().getWindow());
         if (file != null)
         {
-            running = false;
-            menuCBind.setText("Bind");
+            disconnect();
 
             resetAll();
 
@@ -501,8 +560,7 @@ public class Remologue extends Application implements Runnable
                     {
                         dataFiltered.addAll(item);
                     }
-                    else if (filter && item.getMessage().contains(filterText) &&
-                            item.getLevelInt() <= filterLevel)
+                    else if (filter && filterCheck(item.getMessage()) && item.getLevelInt() <= filterLevel)
                     {
                         dataFiltered.addAll(item);
                     }
@@ -522,24 +580,15 @@ public class Remologue extends Application implements Runnable
         Alert alert = new Alert(AlertType.INFORMATION);
         alert.setTitle("About");
         alert.setHeaderText(null);
-        alert.setContentText("Remologue Copyright 2017");
+        alert.setContentText("Remologue\nCopyright 2017 Behrooz Kamary Aliabadi");
         alert.showAndWait();
     }
 
     void connect()
     {
-        if (running)
-        {
-            running = false;
-            menuCBind.setText("Bind");
-        }
-        else
-        {
-            thread = new Thread(this);
-            running = true;
-            thread.start();
-            menuCBind.setText("Unbind");
-        }
+        thread = new Thread(this);
+        running = true;
+        thread.start();
     }
 
     void resetAll()
@@ -548,11 +597,56 @@ public class Remologue extends Application implements Runnable
         dataFiltered.clear();
     }
 
+    void disconnect()
+    {
+        running = false;
+        if (socket != null) socket.close();
+        socket = null;
+        thread = null;
+    }
+
     void addInternalLog(String msg)
     {
         String time = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss.SSS").format(new Date());
         SyslogItem item = new SyslogItem(time, SyslogItem.LOG_REMO, SyslogItem.LOG_INTERN, msg);
         data.addAll(item);
     }
-    
+
+    boolean filterCheck(String text)
+    {
+        Pattern pattern = Pattern.compile(filterText);
+        Matcher matcher = pattern.matcher(text);
+        return matcher.lookingAt();
+    }
+
+    public static String getPath (Object o)
+    {
+        if ( o == null )
+        {
+            return null;
+        }
+
+        Class<?> c = o.getClass();
+        ClassLoader loader = c.getClassLoader();
+
+        if ( loader == null )
+        {
+            // Try the bootstrap classloader - obtained from the ultimate parent of the System Class Loader.
+            loader = ClassLoader.getSystemClassLoader();
+            while ( loader != null && loader.getParent() != null )
+            {
+                loader = loader.getParent();
+            }
+        }
+        if (loader != null)
+        {
+            String name = c.getCanonicalName();
+            URL resource = loader.getResource(name.replace(".", "/") + ".class");
+            if ( resource != null )
+            {
+                return resource.toString();
+            }
+        }
+        return null;
+    }
 }

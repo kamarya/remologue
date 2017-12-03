@@ -24,61 +24,24 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
 public class Settings
 {
     private static Settings instance = null;
 
-    private String   ip_address     = null;
+    private String   ifc            = null;
     private int      port           = 0;
     private String   protocol       = null;
     private String   user_home      = null;
     private List<String> ignoreList = new ArrayList<String>();
 
+    private ErrorStatus err = ErrorStatus.NONE;
+
     protected Settings()
     {
-        user_home = System.getProperty("user.home");
-
-        String local = getSettings();
-
-        if (local == null) return;
-
-        try
-        {
-            JSONTokener jsonTokener = new JSONTokener(local);
-            JSONObject setting = new JSONObject(jsonTokener);
-
-            JSONObject jsonBind = setting.getJSONObject("bind");
-
-            if (jsonBind != null)
-            {
-                ip_address = jsonBind.getString("ip");
-                port = jsonBind.getInt("port");
-                protocol = jsonBind.getString("protocol");
-            }
-            else
-            {
-                ip_address = "0.0.0.0"; // listen on all interfaces
-                port = 5514;
-                protocol = "udp";
-            }
-
-            JSONArray jsonIgnore = setting.getJSONArray("ignore-list");
-
-            if (jsonIgnore != null)
-            {
-                for (int i = 0; i < jsonIgnore.length(); i++)
-                { 
-                    ignoreList.add(jsonIgnore.getString(i));
-                    System.out.println("ignore : " + jsonIgnore.getString(i));
-                }
-            }
-        }
-        catch (JSONException ex)
-        {
-            System.out.println("JSON parser exception.");
-        }
-
-        System.out.println("User Home : " + user_home);
+        reload();
     }
 
     private String getSettings()
@@ -103,12 +66,75 @@ public class Settings
         catch (Exception ex)
         {
             System.out.println("could not read neither the local nor the default settings file.");
+            err = ErrorStatus.SETTINGS_CRITICAL;
         }
 
         return ret;
     }
 
+    public void reload()
+    {
+        err = ErrorStatus.NONE;
 
+        user_home = System.getProperty("user.home");
+
+        String local = getSettings();
+
+        if (local == null) return;
+
+        ignoreList.clear();
+
+        try
+        {
+            JSONTokener jsonTokener = new JSONTokener(local);
+            JSONObject setting = new JSONObject(jsonTokener);
+
+            JSONObject jsonBind = setting.getJSONObject("bind");
+
+            if (jsonBind != null)
+            {
+                ifc = jsonBind.getString("interface");
+                port = jsonBind.getInt("port");
+                protocol = jsonBind.getString("protocol").toLowerCase();
+            }
+            else
+            {
+                ifc = "0.0.0.0"; // listen on all interfaces
+                port = 5514;
+                protocol = "udp";
+                err = ErrorStatus.SETTINGS_DEFAULT;
+            }
+
+            JSONObject jsonMessage = setting.getJSONObject("message");
+            if (jsonMessage != null)
+            {
+                JSONArray jsonIgnore = jsonMessage.getJSONArray("wipeoff");
+                if (jsonIgnore != null)
+                {
+                    String rule;
+                    for (int i = 0; i < jsonIgnore.length(); i++)
+                    {
+                        rule = jsonIgnore.getString(i);
+
+                        if (Settings.validateRegEx(rule))
+                        {
+                            ignoreList.add(rule);
+                        }
+                        else
+                        {
+                            System.out.println("invalid regex : " + rule);
+                            err = ErrorStatus.SETTINGS_IGNORED;
+                        }
+                    }
+                }
+            }
+        }
+        catch (JSONException ex)
+        {
+            System.out.println("JSON parser exception.");
+            err = ErrorStatus.SETTINGS_CRITICAL;
+        }
+    }
 
     public static Settings getInstance()
     {
@@ -116,9 +142,28 @@ public class Settings
         return instance;
     }
 
-    public String getIPAddress() {return ip_address;}
-    public int getPort() {return port;}
-    public String getProtocol() {return protocol;}
-    public String getUserHome() {return  user_home;}
+    public static boolean validateRegEx(String pat)
+    {
+        try
+        {
+            Pattern.compile(pat);
+        }
+        catch (PatternSyntaxException exception)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public ErrorStatus getStatus()
+    {
+        return err;
+    }
+
+    public String       getInterface()  {return ifc;}
+    public int          getPort()       {return port;}
+    public String       getProtocol()   {return protocol;}
+    public String       getUserHome()   {return  user_home;}
     public List<String> getIgnoreList() {return ignoreList;}
 }

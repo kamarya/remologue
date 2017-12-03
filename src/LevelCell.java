@@ -61,6 +61,10 @@ public class LevelCell extends TableCell<SyslogItem, String>
             {
                 setTextFill(Color.ORANGE);
             }
+            else if (auxItem.getLevel().equals("INTERN"))
+            {
+                setTextFill(Color.GREY);
+            }
             else
             {
                 setTextFill(Color.BLACK);

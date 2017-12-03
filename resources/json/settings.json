@@ -3,7 +3,7 @@
         "start_tag":"",
         "end_tag":"",
         "wipeoff":[
-            "home.network",
+            "mynetwork",
             "(Jan|Feb|Mar|May|Apr|Jun|Jul|Aug|Sep|Nov|Dec)\\s+\\d{1,2} \\d{1,2}:\\d{1,2}:\\d{1,2}"
         ]
    },
