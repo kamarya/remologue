@@ -10,7 +10,13 @@ targetCompatibility = jdkVersion
 
 mainClassName = 'Remologue'
 
+repositories {
+    mavenCentral()
+}
 
+dependencies {
+    compile group: 'org.json', name: 'json', version: '20171018'
+}
 
 sourceSets {
     main {
