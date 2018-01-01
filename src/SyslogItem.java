@@ -58,6 +58,7 @@ public class SyslogItem
     public static final int LOG_REMO    = 99; // Internal
 
     private final SimpleStringProperty time;
+    private SimpleStringProperty server;
     private final SimpleStringProperty facility;
     private final SimpleStringProperty level;
     private final SimpleStringProperty message;
@@ -65,19 +66,21 @@ public class SyslogItem
     private final int       intLevel;
     private final String    raw;
 
-    SyslogItem(String time, String facility, String level, String message)
+    SyslogItem(String time, String server, String facility, String level, String message)
     {
         this.raw        = new String();
         this.time       = new SimpleStringProperty(time);
+        this.server     = new SimpleStringProperty(server);
         this.facility   = new SimpleStringProperty(facility);
         this.level      = new SimpleStringProperty(level);
         this.message    = new SimpleStringProperty(message);
         this.intLevel   = 0;
     }
 
-    SyslogItem(String time, int facility, int level, String message)
+    SyslogItem(String time, String server, int facility, int level, String message)
     {
         this.time       = new SimpleStringProperty(time);
+        this.server     = new SimpleStringProperty(server);
         this.facility   = new SimpleStringProperty(getFacilityString(facility));
         this.level      = new SimpleStringProperty(getLevelString(level));
         this.message    = new SimpleStringProperty(message);
@@ -85,6 +88,12 @@ public class SyslogItem
 
         int flag = level & LOG_LEVMASK + (facility << 3) & LOG_FACMASK;
         this.raw = "<" + Integer.toString(flag) + ">" + message;
+    }
+
+    SyslogItem(String server, String line)
+    {
+        this(line);
+        this.server     = new SimpleStringProperty(server);
     }
 
     SyslogItem(String line)
@@ -97,7 +106,9 @@ public class SyslogItem
         int flag        = Integer.parseInt(priority);
         int intFacility = (flag & LOG_FACMASK) >> 3;
         int intLevel    = flag & LOG_LEVMASK;
+
         this.intLevel   = intLevel;
+        this.server     = new SimpleStringProperty();
         this.facility   = new SimpleStringProperty(getFacilityString(intFacility));
         this.level      = new SimpleStringProperty(getLevelString(intLevel));
         this.message    = new SimpleStringProperty(line.substring(endBracketPos + 1));
@@ -118,6 +129,16 @@ public class SyslogItem
     public void setTime(String time)
     {
         this.time.set(time);
+    }
+
+    public String getServer()
+    {
+        return server.get();
+    }
+
+    public void setServer(String server)
+    {
+        this.server.set(server);
     }
 
     public String getFacility()

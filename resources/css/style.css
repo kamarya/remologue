@@ -7,3 +7,8 @@
     -fx-font-size: 11;
     -fx-font-family: "Courier";
 }
+
+.table-row-cell:selected {-fx-table-cell-border-color: transparent;}
+.table-row-cell:filled:selected {-fx-table-cell-border-color: transparent;}
+.table-view {-fx-selection-bar:-fx-selection-bar-non-focused;}
+

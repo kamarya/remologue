@@ -109,7 +109,8 @@ public class Remologue extends Application implements Runnable
     private int     filterLevel;
     private final static int SOCKET_TIMEOUT = 10000;
 
-    private double MenuHeight = 5.0;
+    private double  MenuHeight   = 5.0;
+    private boolean filterchange = false;
 
     public static void main(String[] args)
     {
@@ -135,6 +136,9 @@ public class Remologue extends Application implements Runnable
         TableColumn <SyslogItem, String> timeCol = new TableColumn <SyslogItem, String> ("Time");
         timeCol.setCellValueFactory(new PropertyValueFactory<SyslogItem,String>("time"));
 
+        TableColumn <SyslogItem, String> serverCol = new TableColumn <SyslogItem, String> ("Server");
+        serverCol.setCellValueFactory(new PropertyValueFactory<SyslogItem,String>("server"));
+
         TableColumn <SyslogItem, String> facilityCol = new TableColumn <SyslogItem, String> ("Facility");
         facilityCol.setCellValueFactory(new PropertyValueFactory<SyslogItem,String>("facility"));
 
@@ -146,6 +150,7 @@ public class Remologue extends Application implements Runnable
         messageCol.prefWidthProperty().bind(
                 table.widthProperty()
                 .subtract(timeCol.widthProperty())
+                .subtract(serverCol.widthProperty())
                 .subtract(facilityCol.widthProperty())
                 .subtract(levelCol.widthProperty())
                 .subtract(0));
@@ -159,6 +164,7 @@ public class Remologue extends Application implements Runnable
 
         // we wanna avoid addAll() warning
         table.getColumns().add(timeCol);
+        table.getColumns().add(serverCol);
         table.getColumns().add(facilityCol);
         table.getColumns().add(levelCol);
         table.getColumns().add(messageCol);
@@ -233,6 +239,12 @@ public class Remologue extends Application implements Runnable
 
             while(running)
             {
+                if (filterchange)
+                {
+                    applyFilter();
+                    filterchange = false;
+                }
+
                 try
                 {
                     socket.receive(packet);
@@ -249,7 +261,7 @@ public class Remologue extends Application implements Runnable
                 for (String repl : ignoreList)
                     message = message.replaceAll(repl, "");
 
-                item = new SyslogItem(message);
+                item = new SyslogItem(packet.getAddress().getHostAddress(), message);
 
                 data.addAll(item);
 
@@ -348,10 +360,10 @@ public class Remologue extends Application implements Runnable
         butClear.setDisable(true);
 
         butApply = new Button("Apply");
-        butApply.setOnAction(event -> {applyFilter();});
+        butApply.setOnAction(event -> {filterchange = true;});
 
         search.setOnKeyReleased(event -> {
-            if (event.getCode() == KeyCode.ENTER) applyFilter();
+            if (event.getCode() == KeyCode.ENTER) filterchange = true;
         });
 
         levelCombo = new ComboBox<String>();
@@ -608,7 +620,7 @@ public class Remologue extends Application implements Runnable
     void addInternalLog(String msg)
     {
         String time = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss.SSS").format(new Date());
-        SyslogItem item = new SyslogItem(time, SyslogItem.LOG_REMO, SyslogItem.LOG_INTERN, msg);
+        SyslogItem item = new SyslogItem(time, "local", SyslogItem.LOG_REMO, SyslogItem.LOG_INTERN, msg + System.lineSeparator());
         data.addAll(item);
     }
 
@@ -618,5 +630,4 @@ public class Remologue extends Application implements Runnable
         Matcher matcher = pattern.matcher(text);
         return matcher.lookingAt();
     }
-
 }
