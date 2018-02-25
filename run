@@ -12,6 +12,16 @@ function usage() {
 }
 
 # function
+function download_json_org {
+	curl -OL https://github.com/stleary/JSON-java/archive/20171018.tar.gz
+	tar -xvf 20171018.tar.gz
+	mkdir -p src/org/json
+	mv JSON-java-20171018/*.java src/org/json/
+	rm -rf JSON-java-20171018
+	rm -f 20171018.tar.gz
+}
+
+# function
 function check_jre_jdk() {
     if type -p java; then
         _java=java
@@ -109,6 +119,10 @@ if [ "$OPTION" == "clean" ];then
     echo \'build\' has been removed.
     rm -rf build
     exit
+fi
+
+if [[ ! -d src/org/json ]];then
+	download_json_org
 fi
 
 check_jre_jdk
