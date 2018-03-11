@@ -75,11 +75,20 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SocketChannel;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Set;
+import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.lang.ClassLoader;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 
 public class Remologue extends Application implements Runnable
 {
@@ -93,13 +102,12 @@ public class Remologue extends Application implements Runnable
     private ObservableList<SyslogItem> data = FXCollections.observableArrayList();
     private ObservableList<SyslogItem> dataFiltered = FXCollections.observableArrayList();
 
-    private DatagramSocket socket;
     private MenuItem menuCBind      = new MenuItem("Bind");
     private static BorderPane root  = new BorderPane();
 
-    private final static float WIDTH    = 700;
-    private final static float HEIGHT   = 500;
-    private final static int PACKETSIZE = 2048;
+    private final static float WIDTH        = 700;
+    private final static float HEIGHT       = 500;
+    private final static int   PACKETSIZE   = 4096;
     private Thread thread;
 
     private static boolean running;
@@ -111,6 +119,11 @@ public class Remologue extends Application implements Runnable
 
     private double  MenuHeight   = 5.0;
     private boolean filterchange = false;
+
+    private ByteBuffer          buffer      = null;
+    private Selector            selector    = null;
+    private DatagramChannel     udpchannel  = null;
+    private ServerSocketChannel tcpchannel  = null;
 
     public static void main(String[] args)
     {
@@ -188,19 +201,19 @@ public class Remologue extends Application implements Runnable
         {
             scene.getStylesheets().addAll(css.toExternalForm());
         }
-        
+
 
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.END)
-            {
-                Platform.runLater( () -> table.scrollTo(table.getItems().size() - 1));
-                return;
-            }
-            if (event.getCode() == KeyCode.HOME)
-            {
-                Platform.runLater( () -> table.scrollTo(1));
-                return;
-            }
+        {
+            Platform.runLater( () -> table.scrollTo(table.getItems().size() - 1));
+            return;
+        }
+        if (event.getCode() == KeyCode.HOME)
+        {
+            Platform.runLater( () -> table.scrollTo(1));
+            return;
+        }
         });
 
         stage.setOnCloseRequest(event -> {handleOnClose(event);});
@@ -216,84 +229,171 @@ public class Remologue extends Application implements Runnable
 
     }
 
+    private void digestPacket(DatagramPacket packet)
+    {
+
+        String      message = new String();
+        SyslogItem  item;
+
+        List<String> ignoreList = Settings.getInstance().getIgnoreList();
+        message = new String(packet.getData(), packet.getOffset(), packet.getLength());
+
+        for (String repl : ignoreList)
+            message = message.replaceAll(repl, "");
+
+        item = new SyslogItem(packet.getAddress().getHostAddress(), message);
+
+        data.addAll(item);
+
+        if (filter && filterText.isEmpty() && item.getLevelInt() <= filterLevel)
+        {
+            dataFiltered.addAll(item);
+        }
+        else if (filter && filterCheck(item.getMessage()) && item.getLevelInt() <= filterLevel)
+        {
+            dataFiltered.addAll(item);
+        }
+    }
+
     // TODO: 'upnp' and 'nat-pmp'
     @Override
     public void run()
     {
         try
         {
-            SocketAddress sockaddr = new InetSocketAddress(
+
+            InetSocketAddress sockaddr = new InetSocketAddress(
                     Settings.getInstance().getInterface(),
                     Settings.getInstance().getPort());
-            socket = new DatagramSocket(sockaddr);
-            socket.setSoTimeout(SOCKET_TIMEOUT);
+
+            buffer  = ByteBuffer.allocate(PACKETSIZE);
+
+            selector = Selector.open();
+
+            if (Settings.getInstance().getProtocol().equals("udp"))
+            {
+                udpchannel = DatagramChannel.open();
+                udpchannel.socket().bind(sockaddr);
+                udpchannel.configureBlocking(false);
+                udpchannel.register(selector, SelectionKey.OP_READ , null);
+            }
+            else if (Settings.getInstance().getProtocol().equals("tcp"))
+            {
+                tcpchannel = ServerSocketChannel.open();
+                tcpchannel.register(selector, SelectionKey.OP_ACCEPT, null);
+            }
+            else
+            {
+                running = false;
+                addInternalLog("unknown protocol (" + Settings.getInstance().getProtocol() + ").");
+                return;
+            }
+
             DatagramPacket packet = new DatagramPacket(new byte[PACKETSIZE], PACKETSIZE);
 
             addInternalLog("socket has been opened.");
             menuCBind.setText("Unbind");
 
-            String      message = new String();
-            SyslogItem  item;
-
-            List<String> ignoreList = Settings.getInstance().getIgnoreList();
-
-            while(running)
-            {
-                if (filterchange)
-                {
-                    applyFilter();
-                    filterchange = false;
-                }
-
-                try
-                {
-                    socket.receive(packet);
-                }
-                catch (SocketTimeoutException ex)
-                {
-                    if (!message.isEmpty()) addInternalLog("inactive log stream.");
-                    message = "";
-                    continue;
-                }
-
-                message = new String(packet.getData(), packet.getOffset(), packet.getLength());
-
-                for (String repl : ignoreList)
-                    message = message.replaceAll(repl, "");
-
-                item = new SyslogItem(packet.getAddress().getHostAddress(), message);
-
-                data.addAll(item);
-
-                if (filter && filterText.isEmpty() && item.getLevelInt() <= filterLevel)
-                {
-                    dataFiltered.addAll(item);
-                }
-                else if (filter && filterCheck(item.getMessage()) && item.getLevelInt() <= filterLevel)
-                {
-                    dataFiltered.addAll(item);
-                }
-            }
-        }
-        catch (SocketException ex)
-        {
-            running = false;
-            addInternalLog("socket has been closed.");
-            menuCBind.setText("Bind");
         }
         catch (Exception ex)
         {
             running = false;
             menuCBind.setText("Bind");
             System.out.println(ex);
+            addInternalLog("socket has been closed.");
         }
 
-        if (socket != null)
+        while(running)
         {
-            socket.close();
-            addInternalLog("socket has been closed.");
-            menuCBind.setText("Bind");
+
+            try
+            {
+
+                int readyChannels = selector.select(SOCKET_TIMEOUT);
+
+                if (filterchange)
+                {
+                    applyFilter();
+                    filterchange = false;
+                }
+
+                if (readyChannels == 0) continue;
+
+                Iterator <SelectionKey> iterKeys = selector.selectedKeys().iterator();
+
+                while (iterKeys.hasNext())
+                {
+                    try
+                    {
+                        SelectionKey key = iterKeys.next();
+
+                        if (!key.isValid())
+                        {
+                            continue;
+                        }
+                        if (key.isAcceptable())
+                        {
+                            SocketChannel client = tcpchannel.accept();
+                            client.configureBlocking(false);
+                            client.register(selector, SelectionKey.OP_READ, null);
+                        }
+                        else if (udpchannel != null && key.isReadable())
+                        {
+                            buffer.clear();
+                            SocketAddress remoteAddr = udpchannel.receive(buffer);
+                            buffer.flip();
+                            int limits = buffer.limit();
+                            byte bytes[] = new byte[limits];
+                            buffer.get(bytes, 0, limits);
+                            digestPacket(new DatagramPacket(bytes, limits, remoteAddr));
+                        }
+                        else if (tcpchannel != null && key.isReadable())
+                        {
+                            SocketChannel client = (SocketChannel) key.channel();
+                            client.read(buffer);
+                            buffer.flip();
+                            int limits = buffer.limit();
+                            byte bytes[] = new byte[limits];
+                            buffer.get(bytes, 0, limits);
+                            SocketAddress tcpaddress = client.getRemoteAddress();
+                            digestPacket(new DatagramPacket(bytes, limits, tcpaddress));
+                        }
+
+                        iterKeys.remove();
+                    }
+                    catch (IOException ex)
+                    {
+                        addInternalLog("IOException " + ex.getMessage());
+                    }
+                }
+            }
+            catch (IOException ex)
+            {
+                addInternalLog("IOException " + ex.getMessage());
+            }
         }
+
+        try
+        {
+            if (udpchannel != null)
+            {
+                udpchannel.close();
+                udpchannel = null;
+            }
+            if (tcpchannel != null)
+            {
+                tcpchannel.close();
+                tcpchannel = null;
+            }
+
+            addInternalLog("socket has been closed.");
+        }
+        catch (IOException ex)
+        {
+            addInternalLog("socket could not be closed properly.");
+        }
+
+        menuCBind.setText("Bind");
 
     }
 
@@ -302,10 +402,10 @@ public class Remologue extends Application implements Runnable
         Platform.runLater(new Runnable() {
             @Override
             public void run()
-            {
-                addInternalLog("Handling event " + event.getEventType());
-                exitApp();
-            }
+        {
+            addInternalLog("Handling event " + event.getEventType());
+            exitApp();
+        }
         });
     }
 
@@ -360,10 +460,17 @@ public class Remologue extends Application implements Runnable
         butClear.setDisable(true);
 
         butApply = new Button("Apply");
-        butApply.setOnAction(event -> {filterchange = true;});
+        butApply.setOnAction(event -> {
+            filterchange = true;
+            selector.wakeup();
+        });
 
         search.setOnKeyReleased(event -> {
-            if (event.getCode() == KeyCode.ENTER) filterchange = true;
+            if (event.getCode() == KeyCode.ENTER)
+        {
+            filterchange = true;
+            selector.wakeup();
+        }
         });
 
         levelCombo = new ComboBox<String>();
@@ -612,8 +719,7 @@ public class Remologue extends Application implements Runnable
     void disconnect()
     {
         running = false;
-        if (socket != null) socket.close();
-        socket = null;
+        if (selector != null) selector.wakeup();
         thread = null;
     }
 
