@@ -1,3 +1,4 @@
+package model;
 /*
  *   Copyright 2017 Behrooz Kamary Aliabadi
  *
@@ -57,16 +58,16 @@ public class SyslogItem
     public static final int LOG_LOCAL7	= 23; // local
     public static final int LOG_REMO    = 99; // Internal
 
-    private final SimpleStringProperty time;
-    private SimpleStringProperty server;
-    private final SimpleStringProperty facility;
-    private final SimpleStringProperty level;
-    private final SimpleStringProperty message;
+    private final SimpleStringProperty  time;
+    private SimpleStringProperty        server;
+    private final SimpleStringProperty  facility;
+    private final SimpleStringProperty  level;
+    private final SimpleStringProperty  message;
 
-    private final int       intLevel;
-    private final String    raw;
+    private final int                   intLevel;
+    private final String                raw;
 
-    SyslogItem(String time, String server, String facility, String level, String message)
+    public SyslogItem(String time, String server, String facility, String level, String message)
     {
         this.raw        = new String();
         this.time       = new SimpleStringProperty(time);
@@ -77,7 +78,7 @@ public class SyslogItem
         this.intLevel   = 0;
     }
 
-    SyslogItem(String time, String server, int facility, int level, String message)
+    public SyslogItem(String time, String server, int facility, int level, String message)
     {
         this.time       = new SimpleStringProperty(time);
         this.server     = new SimpleStringProperty(server);
@@ -90,13 +91,13 @@ public class SyslogItem
         this.raw = "<" + Integer.toString(flag) + ">" + message;
     }
 
-    SyslogItem(String server, String line)
+    public SyslogItem(String server, String line)
     {
         this(line);
         this.server     = new SimpleStringProperty(server);
     }
 
-    SyslogItem(String line)
+    public SyslogItem(String line)
     {
         this.raw = line;
         int startBracketPos = line.indexOf('<');

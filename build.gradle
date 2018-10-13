@@ -1,21 +1,54 @@
 apply plugin: 'java'
 apply plugin: 'java-library'
 apply plugin: 'application'
+apply plugin: 'com.google.osdetector'
 
-
-def jdkVersion = 1.8
+def jdkVersion = 11
 sourceCompatibility = jdkVersion
 targetCompatibility = jdkVersion
 
-
 mainClassName = 'Remologue'
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.google.gradle:osdetector-gradle-plugin:1.6.0'
+    }
+}
+
+ext.platform = osdetector.os == 'osx' ? 'mac' : osdetector.os == 'windows' ? 'win' : osdetector.os
+
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    compile group: 'org.json', name: 'json', version: '20180130'
+    compile group: 'org.json', name: 'json', version: '20180813'
+    compile "org.openjfx:javafx-base:11:$platform"
+    compile "org.openjfx:javafx-graphics:11:$platform"
+    compile "org.openjfx:javafx-controls:11:$platform"
+
+}
+
+compileJava {
+    doFirst {
+        options.compilerArgs = [
+                '--module-path', classpath.asPath,
+                '--add-modules', 'javafx.controls'
+        ]
+    }
+}
+
+run {
+    doFirst {
+        jvmArgs = [
+                '--module-path', classpath.asPath,
+                '--add-modules', 'javafx.controls'
+        ]
+    }
 }
 
 sourceSets {

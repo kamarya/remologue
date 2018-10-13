@@ -14,10 +14,9 @@
  *   limitations under the License.
  */
 
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
 import javafx.scene.control.TableCell;
 import javafx.scene.paint.Color;
+import model.SyslogItem;
 
 public class GenericCell extends TableCell<SyslogItem, String>
 {

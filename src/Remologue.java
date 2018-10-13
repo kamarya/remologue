@@ -16,50 +16,35 @@
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
-import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TableCell;
 import javafx.scene.control.ComboBox;
 import javafx.collections.ObservableList;
 import javafx.collections.FXCollections;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.application.Platform;
-import javafx.event.EventHandler;
 import javafx.stage.WindowEvent;
-import javafx.event.ActionEvent;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.Region;
-import javafx.scene.text.Font;
-import javafx.scene.paint.Color;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Menu;
 import javafx.scene.control.Button;
-import javafx.scene.control.ToolBar;
-import javafx.scene.control.TextField;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import javafx.scene.layout.Priority;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.image.Image;
-import javafx.stage.StageStyle;
-import javafx.geometry.Insets;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCombination;
 import javafx.stage.FileChooser;
+import model.SyslogItem;
 
 import java.io.FileWriter;
 import java.io.FileReader;
@@ -67,14 +52,9 @@ import java.io.File;
 import java.io.BufferedReader;
 import java.io.*;
 import java.net.*;
-import java.util.regex.*;
-import java.util.ArrayList;
 import java.util.List;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.SocketTimeoutException;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SelectionKey;
@@ -82,13 +62,11 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SocketChannel;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Set;
 import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.lang.ClassLoader;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import model.SyslogItem;
 
 public class Remologue extends Application implements Runnable
 {
@@ -232,7 +210,7 @@ public class Remologue extends Application implements Runnable
     private void digestPacket(DatagramPacket packet)
     {
 
-        String      message = new String();
+        String      message;
         SyslogItem  item;
 
         List<String> ignoreList = Settings.getInstance().getIgnoreList();
