@@ -3,9 +3,8 @@ apply plugin: 'java-library'
 apply plugin: 'application'
 apply plugin: 'com.google.osdetector'
 
-def jdkVersion = 11
-sourceCompatibility = jdkVersion
-targetCompatibility = jdkVersion
+sourceCompatibility = 11
+targetCompatibility = 11
 
 mainClassName = 'Remologue'
 

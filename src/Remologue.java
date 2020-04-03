@@ -1,5 +1,5 @@
 /*
- *   Copyright 2017 Behrooz Kamary Aliabadi
+ *   Copyright 2017 Behrooz Kamary
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.application.Platform;
 import javafx.stage.WindowEvent;
+import javafx.stage.Modality;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.Region;
 import javafx.scene.control.MenuBar;
@@ -66,7 +67,6 @@ import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.nio.ByteBuffer;
-import model.SyslogItem;
 
 public class Remologue extends Application implements Runnable
 {
@@ -266,8 +266,6 @@ public class Remologue extends Application implements Runnable
                 addInternalLog("unknown protocol (" + Settings.getInstance().getProtocol() + ").");
                 return;
             }
-
-            DatagramPacket packet = new DatagramPacket(new byte[PACKETSIZE], PACKETSIZE);
 
             addInternalLog("socket has been opened.");
             menuCBind.setText("Unbind");
@@ -574,6 +572,8 @@ public class Remologue extends Application implements Runnable
         alert.setTitle("Remologue");
         alert.setHeaderText(null);
         alert.setContentText(msg);
+        alert.initModality(Modality.APPLICATION_MODAL);
+        alert.initOwner(root.getScene().getWindow());
         alert.showAndWait();
     }
 
@@ -677,7 +677,9 @@ public class Remologue extends Application implements Runnable
         Alert alert = new Alert(AlertType.INFORMATION);
         alert.setTitle("About");
         alert.setHeaderText(null);
-        alert.setContentText("Remologue\nCopyright 2017 Behrooz Kamary Aliabadi");
+        alert.initModality(Modality.APPLICATION_MODAL);
+        alert.initOwner(root.getScene().getWindow());
+        alert.setContentText("Remologue\nCopyright 2017 - 2020 Behrooz Kamary");
         alert.showAndWait();
     }
 

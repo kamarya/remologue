@@ -1,5 +1,5 @@
 /*
- *   Copyright 2017 Behrooz Kamary Aliabadi
+ *   Copyright 2017 Behrooz Kamary
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -16,12 +16,7 @@
 
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
-import javafx.event.EventHandler;
-import javafx.scene.Cursor;
-import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.Region;
 
 public class SearchBox extends TextField implements ChangeListener<String>
 {
