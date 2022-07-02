@@ -1,5 +1,8 @@
 # Remologue
 A Syslog message logging network client with a JavaFX graphical user interface (GUI).
+
+![](remologue.svg)
+
 ## Build and Run
 Java Development Kit (JDK) 1.8 or later is required. Change the required version in the Gradle build script.
 
